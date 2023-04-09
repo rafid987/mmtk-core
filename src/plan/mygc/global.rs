@@ -16,10 +16,9 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 
-#[cfg(not(feature = "mygc_lock_free"))]
+
 use crate::policy::immortalspace::ImmortalSpace as MyGCImmortalSpace;
-#[cfg(feature = "mygc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as MyGCImmortalSpace;
+
 
 pub struct MyGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
@@ -70,7 +69,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.nogc_space.reserved_pages()
+        self.mygc_space.reserved_pages()
             + self.immortal.reserved_pages()
             + self.los.reserved_pages()
             + self.base.get_used_pages()
