@@ -49,6 +49,8 @@ mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
+pub mod mygc;
+pub mod ng1gc;
 
 pub(crate) use generational::global::is_nursery_gc;
 pub(crate) use generational::global::GenerationalPlan;
