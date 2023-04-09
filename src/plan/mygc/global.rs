@@ -1,7 +1,7 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -16,30 +16,30 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 
-#[cfg(not(feature = "nogc_lock_free"))]
-use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
-#[cfg(feature = "nogc_lock_free")]
-use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
+#[cfg(not(feature = "mygc_lock_free"))]
+use crate::policy::immortalspace::ImmortalSpace as MyGCImmortalSpace;
+#[cfg(feature = "mygc_lock_free")]
+use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as MyGCImmortalSpace;
 
-pub struct NoGC<VM: VMBinding> {
+pub struct MyGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
-    pub nogc_space: NoGCImmortalSpace<VM>,
+    pub mygc_space: MyGCImmortalSpace<VM>,
     pub immortal: ImmortalSpace<VM>,
     pub los: ImmortalSpace<VM>,
 }
 
-pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+pub const MyGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
-impl<VM: VMBinding> Plan for NoGC<VM> {
+impl<VM: VMBinding> Plan for MyGC<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
-        &NOGC_CONSTRAINTS
+        &MyGC_CONSTRAINTS
     }
 
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.base.get_spaces();
-        ret.push(&self.nogc_space);
+        ret.push(&self.mygc_space);
         ret.push(&self.immortal);
         ret.push(&self.los);
         ret
@@ -66,7 +66,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
-        unreachable!("GC triggered in nogc")
+        unreachable!("GC triggered in mygc")
     }
 
     fn get_used_pages(&self) -> usize {
@@ -82,22 +82,22 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         _force: bool,
         _exhaustive: bool,
     ) {
-        warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+        warn!("User attempted a collection request, but it is not supported in MyGC. The request is ignored.");
     }
 }
 
-impl<VM: VMBinding> NoGC<VM> {
+impl<VM: VMBinding> MyGC<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
-            constraints: &NOGC_CONSTRAINTS,
+            constraints: &MyGC_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
-                "nogc_space",
-                cfg!(not(feature = "nogc_no_zeroing")),
+        let res = MyGC {
+            mygc_space: MyGCImmortalSpace::new(plan_args.get_space_args(
+                "mygc_space",
+                cfg!(not(feature = "mygc_no_zeroing")),
                 VMRequest::discontiguous(),
             )),
             immortal: ImmortalSpace::new(plan_args.get_space_args(
@@ -118,7 +118,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
+        res.mygc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
 
         res
